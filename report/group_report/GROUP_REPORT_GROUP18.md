@@ -1,120 +1,120 @@
-# Group Report: Lab 3 - Production-Grade Agentic System
+# Báo Cáo Nhóm: Lab 3 - Hệ Thống Agentic Mức Production
 
-- **Team Name**: Group18
-- **Team Members**: TBD
-- **Deployment Date**: 2026-04-06
-
----
-
-## 1. Executive Summary
-
-This project upgrades a baseline chatbot into a ReAct-style e-commerce agent that can call real tools (price lookup, stock check, discount lookup, shipping calculation, calculator, and web search) with telemetry logging for each step.
-
-- **Success Rate**: 40% strict success (2/5 test cases), 60% partial success (3/5) on `phase4_agent_v2_eval_20260406_154221.json`.
-- **Key Outcome**: Compared to chatbot baseline, the agent produced tool-grounded answers with source links and explicit intermediate reasoning for price/tax workflows; baseline mostly returned generic or unverifiable responses for multi-step tasks.
+- **Tên Nhóm**: Group18
+- **Thành Viên**: Chu Thành Thông 2A202600014, Nguyễn Công Hùng 2A202600140, Bùi Đức Tiến 2A202600003, Phùng Hữu Phú 2A202600283, Trần Lê Dũng 2A202600014
+- **Ngày Triển Khai**: 2026-04-06
 
 ---
 
-## 2. System Architecture & Tooling
+## 1. Tóm Tắt Điều Hành
 
-### 2.1 ReAct Loop Implementation
-The implementation follows a strict loop in `ReActAgent`:
-1. Build prompt from conversation history + system policy.
-2. LLM returns either:
-   - `Action: tool_name(arguments)`, or
+Dự án nâng cấp chatbot baseline thành agent ReAct cho bài toán e-commerce, có thể gọi tool thực tế (tra giá, kiểm tra tồn kho, tìm mã giảm giá, tính phí vận chuyển, máy tính, tìm kiếm web) và ghi telemetry ở từng bước suy luận.
+
+- **Tỷ lệ thành công**: 40% thành công nghiêm ngặt (2/5 test case), 60% thành công một phần (3/5) theo file `phase4_agent_v2_eval_20260406_154221.json`.
+- **Kết quả chính**: So với chatbot baseline, agent cho câu trả lời bám tool tốt hơn, có nguồn tham chiếu và có bước trung gian rõ ràng cho bài toán giá/thuế; trong khi baseline chủ yếu trả lời chung chung hoặc khó kiểm chứng ở tác vụ nhiều bước.
+
+---
+
+## 2. Kiến Trúc Hệ Thống & Công Cụ
+
+### 2.1 Cách triển khai vòng lặp ReAct
+Luồng xử lý trong `ReActAgent` gồm:
+1. Tạo prompt từ lịch sử hội thoại và system policy.
+2. LLM trả về một trong hai dạng:
+   - `Action: tool_name(arguments)`, hoặc
    - `Final Answer: ...`
-3. Agent parses action, executes one tool, appends `Observation`.
-4. Repeat until final answer or `max_steps`.
-5. Every step is logged (`AGENT_STEP`, `TOOL_CALL`, `LLM_METRIC`, `AGENT_END`) for traceability.
+3. Agent parse action, thực thi một tool, rồi thêm `Observation` vào history.
+4. Lặp lại cho đến khi có đáp án cuối hoặc chạm `max_steps`.
+5. Mỗi bước đều được log (`AGENT_STEP`, `TOOL_CALL`, `LLM_METRIC`, `AGENT_END`) để truy vết.
 
-`ReActAgentV2` adds domain guardrails (only e-commerce), tighter tool constraints, and recovery hints on max-step failures.
+`ReActAgentV2` bổ sung guardrail theo domain (chỉ e-commerce), ràng buộc chặt hơn khi gọi tool, và recovery hint khi chạm giới hạn bước.
 
-### 2.2 Tool Definitions (Inventory)
-| Tool Name | Input Format | Use Case |
+### 2.2 Danh mục công cụ (Inventory)
+| Tên Tool | Định dạng Input | Mục đích sử dụng |
 | :--- | :--- | :--- |
-| `price_lookup` | `string` (product name) | Fetch/parse product prices from mapped store URLs, with fallback demo data. |
-| `check_stock` | `string` (product name) | Infer in-stock/out-of-stock status from store pages, with fallback demo data. |
-| `get_discount` | `string` (coupon code) | Search web snippets for discount percentages and summarize best observed discount. |
-| `calc_shipping` | `string` (`"<weight_kg>, <destination>"`) | Calculate shipping fee via GHN API (or demo fallback if env not configured). |
-| `calculator` | `string` (math expression) | Evaluate arithmetic expressions for totals, VAT, and final pricing. |
-| `web_search` | `string` (query) | Perform DuckDuckGo-based web search and return top results/snippets/links. |
+| `price_lookup` | `string` (tên sản phẩm) | Lấy/parse giá sản phẩm từ URL cửa hàng đã map, có fallback demo data. |
+| `check_stock` | `string` (tên sản phẩm) | Suy luận trạng thái còn hàng/hết hàng từ trang cửa hàng, có fallback demo data. |
+| `get_discount` | `string` (mã giảm giá) | Tìm snippet trên web để lấy phần trăm giảm giá và tổng hợp mức tốt nhất. |
+| `calc_shipping` | `string` (`"<weight_kg>, <destination>"`) | Tính phí vận chuyển qua GHN API (hoặc fallback demo khi thiếu env). |
+| `calculator` | `string` (biểu thức toán) | Tính toán số học cho tổng tiền, VAT và giá cuối cùng. |
+| `web_search` | `string` (truy vấn) | Tìm kiếm web qua DuckDuckGo và trả về tiêu đề/mô tả/link kết quả. |
 
-### 2.3 LLM Providers Used
-- **Primary**: OpenAI `gpt-4o` (from `DEFAULT_PROVIDER=openai` and logged runs).
-- **Secondary (Backup)**: Gemini `gemini-1.5-flash` (supported in provider factory), plus optional local GGUF model (`Phi-3-mini-4k-instruct`).
-
----
-
-## 3. Telemetry & Performance Dashboard
-
-Metrics are aggregated from per-question telemetry logs in `logs/questions/20260406_154221_question_*.log` (`LLM_METRIC` events, 27 total LLM calls):
-
-- **Average Latency (P50)**: `1055 ms`
-- **Max Latency (P99)**: `2446 ms` (nearest-rank p99 over 27 calls)
-- **Average Tokens per Task**: `889.15` tokens per LLM call
-- **Total Cost of Test Suite**: `$0.24007` (using project mock formula: `total_tokens/1000 * 0.01`)
-
-Operational signal summary (same run):
-- 5 questions processed, 23 tool calls, 1 parser error, 2 max-step recoveries (`V2_RECOVERY_HINT`).
+### 2.3 LLM Providers sử dụng
+- **Chính**: OpenAI `gpt-4o` (theo `DEFAULT_PROVIDER=openai` và các run log).
+- **Dự phòng**: Gemini `gemini-1.5-flash` (được hỗ trợ trong provider factory), thêm tùy chọn local GGUF (`Phi-3-mini-4k-instruct`).
 
 ---
 
-## 4. Root Cause Analysis (RCA) - Failure Traces
+## 3. Telemetry & Dashboard Hiệu Năng
 
-### Case Study: Tool coverage gap + parse fallback failure (Case 04)
-- **Input**: Nintendo Switch cross-market comparison with FX conversion + import tax + VAT.
-- **Observation**:
-  - Early tool call returned: `Error: no live URL mapping configured for 'nintendo switch oled'. Supported products: iphone 15, macbook air m3.`
-  - At step 7, model produced free-form plan text instead of `Action:`/`Final Answer`, triggering `PARSER_ERROR`.
-  - Session ended with max-step timeout.
-- **Root Cause**:
-  1. Tool inventory is product-mapped and too narrow (only a small subset has live URL mapping).
-  2. Prompt constraints are strict, but no robust fallback strategy exists when all relevant tools return unsupported-product errors.
-  3. Parser depends on exact output format; once model drifts into narrative mode, loop loses progress.
+Số liệu được tổng hợp từ log theo từng câu hỏi tại `logs/questions/20260406_154221_question_*.log` (sự kiện `LLM_METRIC`, tổng 27 lần gọi LLM):
 
-### Case Study: Bundle planning complexity exceeds current tool granularity (Case 05)
-- **Input**: 12 keyboards + 12 mice, multi-store stock checks, bulk discount, shipping optimization.
-- **Observation**:
-  - Multiple tool calls failed due to unsupported product names (`mechanical keyboard`, `... store mechanical keyboard`).
-  - Agent kept iterating but could not form a valid, grounded plan before `max_steps`.
-- **Root Cause**:
-  1. No structured tool for basket optimization / split-order planning.
-  2. Product normalization is weak (tool expects exact mapped keys).
-  3. `max_steps=8` is insufficient for long-chain constrained planning without specialized planner state.
+- **Độ trễ trung vị (P50)**: `1055 ms`
+- **Độ trễ cao (P99)**: `2446 ms` (nearest-rank p99 trên 27 mẫu)
+- **Số token trung bình mỗi tác vụ**: `889.15` token mỗi lần gọi LLM
+- **Tổng chi phí test suite**: `$0.24007` (theo công thức mock của dự án: `total_tokens/1000 * 0.01`)
+
+Tín hiệu vận hành từ cùng run:
+- 5 câu hỏi được xử lý, 23 lần gọi tool, 1 lỗi parser, 2 lần recovery khi chạm `max_steps` (`V2_RECOVERY_HINT`).
 
 ---
 
-## 5. Ablation Studies & Experiments
+## 4. Phân Tích Nguyên Nhân Gốc (RCA) - Vết Lỗi
 
-### Experiment 1: Prompt v1 vs Prompt v2
-- **Diff**:
-  - v2 system prompt adds strict policies: e-commerce-only scope, one-tool-per-step, retry-on-error, short web queries, and explicit final-answer format.
-  - v2 agent adds out-of-domain blocker and recovery hint logging.
-- **Result**:
-  - Reliability improved for grounded tool usage in solvable mapped-product cases (e.g., Case 01 includes concrete source links and reproducible tax computation).
-  - Trade-off: unsupported-product scenarios now fail explicitly (max-step) rather than returning speculative/hallucinated long-form answers.
+### Case Study: Thiếu coverage tool + lỗi parse fallback (Case 04)
+- **Input**: So sánh Nintendo Switch đa thị trường, quy đổi ngoại tệ + thuế nhập khẩu + VAT.
+- **Quan sát**:
+  - Lần gọi tool sớm trả về lỗi: `Error: no live URL mapping configured for 'nintendo switch oled'. Supported products: iphone 15, macbook air m3.`
+  - Ở step 7, model tạo text dạng kế hoạch tự do thay vì `Action:`/`Final Answer`, gây `PARSER_ERROR`.
+  - Phiên chạy kết thúc do chạm `max_steps`.
+- **Nguyên nhân gốc**:
+  1. Inventory tool map theo sản phẩm còn hẹp (chỉ một vài sản phẩm có URL live).
+  2. Prompt ràng buộc chặt nhưng chưa có chiến lược fallback đủ mạnh khi các tool liên tục trả lỗi unsupported.
+  3. Parser phụ thuộc format đầu ra tuyệt đối; khi model drift sang narrative thì vòng lặp mất trạng thái.
 
-### Experiment 2 (Bonus): Chatbot vs Agent
-| Case | Chatbot Result | Agent Result | Winner |
+### Case Study: Bài toán bundle vượt quá độ chi tiết của tool hiện tại (Case 05)
+- **Input**: 12 bàn phím + 12 chuột, kiểm tra tồn kho đa cửa hàng, áp dụng giảm giá số lượng, tối ưu phí ship.
+- **Quan sát**:
+  - Nhiều lần gọi tool thất bại do tên sản phẩm không được hỗ trợ (`mechanical keyboard`, `... store mechanical keyboard`).
+  - Agent tiếp tục lặp nhưng không hội tụ được kế hoạch hợp lệ trước `max_steps`.
+- **Nguyên nhân gốc**:
+  1. Chưa có tool chuyên cho tối ưu giỏ hàng/chia đơn.
+  2. Chuẩn hóa tên sản phẩm còn yếu (tool kỳ vọng key map chính xác).
+  3. `max_steps=8` chưa đủ cho bài toán nhiều ràng buộc nếu không có planner chuyên dụng.
+
+---
+
+## 5. Thí Nghiệm Ablation & So Sánh
+
+### Thí nghiệm 1: Prompt v1 vs Prompt v2
+- **Khác biệt**:
+  - Prompt v2 bổ sung policy chặt: giới hạn domain e-commerce, mỗi bước chỉ 1 tool, retry khi lỗi, query web ngắn, và format final-answer rõ ràng.
+  - Agent v2 bổ sung chặn ngoài domain và logging recovery hint.
+- **Kết quả**:
+  - Độ tin cậy tăng ở các case có coverage tool (ví dụ Case 01 có link nguồn và phép tính thuế tái kiểm chứng được).
+  - Đánh đổi: case ngoài coverage chuyển sang fail rõ ràng (max-step) thay vì trả lời suy đoán dài dòng.
+
+### Thí nghiệm 2 (Bonus): Chatbot vs Agent
+| Trường hợp | Kết quả Chatbot | Kết quả Agent | Bên tốt hơn |
 | :--- | :--- | :--- | :--- |
-| Case 01 (price + tax) | Refused real-time data, no computed final from live stores | Returned cheapest store, links, and computed taxed total | **Agent** |
-| Case 02 (shipping + discount) | Asked user for missing values | Produced end-to-end total (partly assumption-based) | **Agent** |
-| Case 03 (stock + VAT) | Could not verify stock | Produced tool-assisted estimate with assumption note | **Agent** |
-| Case 04 (FX import) | Generic guidance only | Timed out due to unsupported product + parser drift | Draw |
-| Case 05 (bundle plan) | Hypothetical plan without verification | Timed out due to unsupported product mapping | Draw |
+| Case 01 (giá + thuế) | Từ chối dữ liệu thời gian thực, không tính kết quả cuối từ dữ liệu live | Trả về cửa hàng rẻ nhất, có link và có tính thuế | **Agent** |
+| Case 02 (ship + discount) | Yêu cầu người dùng cung cấp thêm dữ liệu | Cho kết quả end-to-end (có một phần giả định) | **Agent** |
+| Case 03 (stock + VAT) | Không xác minh được tồn kho | Có ước tính dựa trên tool và nêu giả định | **Agent** |
+| Case 04 (FX import) | Chỉ hướng dẫn chung | Timeout do thiếu mapping sản phẩm + parser drift | Hòa |
+| Case 05 (bundle plan) | Kế hoạch giả định, không xác minh | Timeout do thiếu mapping sản phẩm | Hòa |
 
 ---
 
-## 6. Production Readiness Review
+## 6. Đánh Giá Sẵn Sàng Production
 
-- **Security**:
-  - Tool inputs are partially sanitized (e.g., `calculator` restricts allowed characters; shipping validates numeric weight).
-  - Needed next: stronger validation and schema-based argument parsing for all tools.
+- **Bảo mật**:
+  - Input tool đã được làm sạch một phần (ví dụ `calculator` giới hạn ký tự hợp lệ, shipping kiểm tra trọng lượng số).
+  - Cần bổ sung: validation mạnh hơn và parse theo schema cho toàn bộ tool.
 - **Guardrails**:
-  - Current safeguards: `max_steps`, strict output format, domain gate, telemetry for parser/tool failures.
-  - Needed next: confidence thresholds and fail-fast policy when repeated unsupported-product errors occur.
-- **Scaling**:
-  - Current architecture is linear ReAct loop with dynamic tool registry discovery.
-  - Recommended evolution: planner-executor split (or graph-based orchestration) for complex multi-constraint tasks, plus broader product canonicalization and retrieval index.
+  - Hiện có: `max_steps`, format output nghiêm ngặt, chặn domain, telemetry cho parser/tool failures.
+  - Cần bổ sung: ngưỡng confidence và chính sách fail-fast khi gặp lỗi unsupported lặp lại.
+- **Khả năng mở rộng**:
+  - Kiến trúc hiện tại là ReAct loop tuyến tính + đăng ký tool động qua registry.
+  - Hướng nâng cấp: tách planner-executor (hoặc orchestration dạng graph) cho bài toán nhiều ràng buộc, đồng thời mở rộng canonicalization cho sản phẩm.
 
 ---
