@@ -69,7 +69,7 @@ Pipeline hoạt động như sau:
 6. **Final Answer**  
    Khi agent dừng hoặc đạt `max_steps`  
 
-👉 Đây chính là mô hình **ReAct (Reason + Act)**, khác với chatbot truyền thống (one-shot response).
+-> Đây chính là mô hình **ReAct (Reason + Act)**, khác với chatbot truyền thống (one-shot response).
 
 ---
 
