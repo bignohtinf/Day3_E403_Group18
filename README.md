@@ -1,56 +1,104 @@
-# Lab 3: Chatbot vs ReAct Agent (Industry Edition)
+# Day 3 - Chatbot vs ReAct Agent (Group 18)
 
-Welcome to Phase 3 of the Agentic AI course! This lab focuses on moving from a simple LLM Chatbot to a sophisticated **ReAct Agent** with industry-standard monitoring.
+This repository contains our implementation of Lab Day 3, including:
+- Chatbot baseline
+- ReAct Agent v1
+- Improved ReAct Agent v2
+- Tooling, telemetry, evaluation scripts, and demo UI
 
-## 🚀 Getting Started
+## Setup
 
-### 1. Setup Environment
-Copy the `.env.example` to `.env` and fill in your API keys:
-```bash
-cp .env.example .env
-```
+1. Create and activate virtual environment
+2. Install dependencies
+3. Configure `.env`
 
-### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Directory Structure
-- `src/tools/`: Extension point for your custom tools.
+Required for cloud models:
+- `OPENAI_API_KEY` or `GEMINI_API_KEY`
 
-## 🏠 Running with Local Models (CPU)
+Optional for live shipping tool:
+- `GHN_API_TOKEN`
+- `GHN_SHOP_ID`
+- `GHN_FROM_DISTRICT_ID`
+- `GHN_TO_DISTRICT_MAP` (JSON string)
 
-If you don't want to use OpenAI or Gemini, you can run open-source models (like Phi-3) directly on your CPU using `llama-cpp-python`.
+## What We Implemented
 
-### 1. Download the Model
-Download the **Phi-3-mini-4k-instruct-q4.gguf** (approx 2.2GB) from Hugging Face:
-- [Phi-3-mini-4k-instruct-GGUF](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf)
-- Direct Download: [phi-3-mini-4k-instruct-q4.gguf](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf)
+### Agent
+- `src/agent/agent.py`: ReAct Agent v1 loop (Thought -> Action -> Observation)
+- `src/agent/agent_v2.py`: Agent v2 with stronger policy and domain guard for e-commerce queries
 
-### 2. Place Model in Project
-Create a `models/` folder in the root and move the downloaded `.gguf` file there.
+### Tools
+Current tools:
+- `price_lookup`
+- `check_stock`
+- `get_discount`
+- `calc_shipping`
+- `calculator`
+- `web_search`
 
-### 3. Update `.env`
-Change your `DEFAULT_PROVIDER` and set the path:
-```env
-DEFAULT_PROVIDER=local
-LOCAL_MODEL_PATH=./models/Phi-3-mini-4k-instruct-q4.gguf
+Notes:
+- Tools try live data first
+- Fallback demo data is provided in `src/tools/demo_data.py` for stable classroom/demo runs
+
+### Telemetry & Logs
+- Structured logs in `logs/`
+- Per-question logs in `logs/questions/` for Agent v2 evaluation/chat
+
+## Run Scripts
+
+### 1) Chatbot baseline (interactive)
+```bash
+python chatbot.py
 ```
 
-## 🎯 Lab Objectives
+### 2) Phase 1 tool demo
+```bash
+python phase1_tool_design_demo.py
+```
 
-1.  **Baseline Chatbot**: Observe the limitations of a standard LLM when faced with multi-step reasoning.
-2.  **ReAct Loop**: Implement the `Thought-Action-Observation` cycle in `src/agent/agent.py`.
-3.  **Provider Switching**: Swap between OpenAI and Gemini seamlessly using the `LLMProvider` interface.
-4.  **Failure Analysis**: Use the structured logs in `logs/` to identify why the agent fails (hallucinations, parsing errors).
-5.  **Grading & Bonus**: Follow the [SCORING.md](file:///Users/tindt/personal/ai-thuc-chien/day03-lab-agent/SCORING.md) to maximize your points and explore bonus metrics.
+### 3) Phase 2 baseline test cases
+```bash
+python phase2_chatbot_baseline.py
+```
 
-## 🛠️ How to Use This Baseline
-The code is designed as a **Production Prototype**. It includes:
-- **Telemetry**: Every action is logged in JSON format for later analysis.
-- **Robust Provider Pattern**: Easily extendable to any LLM API.
-- **Clean Skeletons**: Focus on the logic that matters—the agent's reasoning process.
+### 4) Agent v1 demo (interactive)
+```bash
+python phase3_agent_v1_demo.py
+```
+
+### 5) Agent v2 terminal chat (memory-style)
+```bash
+python phase4_agent_v2_chat.py
+```
+
+### 6) Agent v2 evaluation on 5 cases
+```bash
+python phase4_agent_v2_eval.py
+```
+
+### 7) Gradio UI
+```bash
+python ecommerce_wizard.py
+```
+
+## Suggested Demo Prompts
+
+- "Find the cheapest iPhone 15 from 3 stores and calculate total for 2 units with 10% tax."
+- "I want to buy 2 iPhones with code WINNER and ship to Hanoi. Compute final total."
+- "Compare laptop gaming options under 25 million VND and recommend best value."
+
+## Repository Structure (main parts)
+
+- `src/agent/` - Agent implementations
+- `src/tools/` - Tool implementations, registry, live parsing utilities, demo data
+- `src/core/` - LLM provider abstractions and provider implementations
+- `src/telemetry/` - Logging and metrics tracking
+- `report/` - Group and individual report templates
 
 ---
 
-*Happy Coding! Let's build agents that actually work.*
+This README reflects the current implementation status of Group 18 (including Agent v2 and demo UI).
