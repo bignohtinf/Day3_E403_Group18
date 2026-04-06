@@ -118,6 +118,3 @@ Operational signal summary (same run):
   - Recommended evolution: planner-executor split (or graph-based orchestration) for complex multi-constraint tasks, plus broader product canonicalization and retrieval index.
 
 ---
-
-> [!NOTE]
-> Before submission, rename this file to `GROUP_REPORT_GROUP18.md` in this folder.
