@@ -1,7 +1,7 @@
 # Báo Cáo Nhóm: Lab 3 - Hệ Thống Agentic Mức Production
 
 - **Tên Nhóm**: Group18
-- **Thành Viên**: Chu Thành Thông 2A202600014, Nguyễn Công Hùng 2A202600140, Bùi Đức Tiến 2A202600003, Phùng Hữu Phú 2A202600283, Trần Lê Dũng 2A202600014
+- **Thành Viên**: Chu Thành Thông 2A202600014, Nguyễn Công Hùng 2A202600140, Bùi Đức Tiến 2A202600003, Phùng Hữu Phú 2A202600283, Trần Lê Dũng 2A202600296
 - **Ngày Triển Khai**: 2026-04-06
 
 ---
