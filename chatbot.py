@@ -34,10 +34,11 @@ def build_provider():
 def run_demo():
     load_dotenv()
     llm = build_provider()
+    history = []
 
     print("=== Phase 01: Chatbot Baseline (No Tools) ===")
     print(f"Provider model: {llm.model_name}")
-    print("Type 'exit' to stop.\n")
+    print("Type 'exit' to stop, 'reset' to clear conversation.\n")
 
     default_prompt = (
         "Find the cheapest price of iPhone 15 from 3 stores, then calculate total "
@@ -48,6 +49,10 @@ def run_demo():
         user_input = input("You: ").strip()
         if user_input.lower() in {"exit", "quit"}:
             break
+        if user_input.lower() == "reset":
+            history = []
+            print("Conversation reset.\n")
+            continue
 
         if not user_input:
             user_input = default_prompt
@@ -58,14 +63,18 @@ def run_demo():
             "You do not have external tools."
         )
 
-        result = llm.generate(user_input, system_prompt=system_prompt)
-        print(f"\nAssistant:\n{result['content']}\n")
+        history.append(f"User: {user_input}")
+        conversation_prompt = "\n".join(history)
+
+        result = llm.generate(conversation_prompt, system_prompt=system_prompt)
+        assistant_text = result.get("content", "")
+        history.append(f"Assistant: {assistant_text}")
+
+        print(f"\nAssistant:\n{assistant_text}\n")
         print(
             f"[usage] prompt={result['usage'].get('prompt_tokens', 0)} "
             f"completion={result['usage'].get('completion_tokens', 0)} "
             f"latency_ms={result.get('latency_ms', 0)}\n"
         )
-
-
 if __name__ == "__main__":
     run_demo()
