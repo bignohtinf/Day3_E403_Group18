@@ -2,6 +2,7 @@ from src.tools.base_tool import BaseTool
 import requests
 from typing import List, Dict
 import re
+from html import unescape
 
 class WebSearchTool(BaseTool):
     """Real web search using DuckDuckGo (no API key required)"""
@@ -11,8 +12,9 @@ class WebSearchTool(BaseTool):
             name="web_search",
             description="Search the web for product information, reviews, prices, and comparisons. Takes search query as input. Returns relevant search results with titles, snippets, and sources."
         )
-        # DuckDuckGo API endpoint
-        self.search_url = "https://api.duckduckgo.com/"
+        # DuckDuckGo endpoints
+        self.instant_answer_url = "https://api.duckduckgo.com/"
+        self.html_search_url = "https://html.duckduckgo.com/html/"
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
@@ -42,8 +44,9 @@ class WebSearchTool(BaseTool):
             return f"Error searching web: {str(e)}"
 
     def _search_web(self, query: str) -> List[Dict]:
-        """Call DuckDuckGo API for real search"""
+        """Call DuckDuckGo for real search results."""
         try:
+            # 1) Try instant-answer API first (can be empty for many queries).
             params = {
                 "q": query,
                 "format": "json",
@@ -52,7 +55,7 @@ class WebSearchTool(BaseTool):
             }
 
             response = requests.get(
-                self.search_url,
+                self.instant_answer_url,
                 params=params,
                 headers=self.headers,
                 timeout=5
@@ -62,8 +65,6 @@ class WebSearchTool(BaseTool):
             data = response.json()
             results = []
 
-            # Extract results from DuckDuckGo response
-            # DuckDuckGo returns results in 'Results' field
             if data.get("Results"):
                 for result in data.get("Results", [])[:3]:
                     results.append({
@@ -72,7 +73,6 @@ class WebSearchTool(BaseTool):
                         "link": result.get("FirstURL", "")
                     })
 
-            # If no results from Results, try RelatedTopics
             if not results and data.get("RelatedTopics"):
                 for topic in data.get("RelatedTopics", [])[:3]:
                     if isinstance(topic, dict) and topic.get("Text"):
@@ -82,7 +82,52 @@ class WebSearchTool(BaseTool):
                             "link": topic.get("FirstURL", "")
                         })
 
-            return results
+            if results:
+                return results
+
+            # 2) Fallback to DuckDuckGo HTML SERP parsing for regular web results.
+            html_response = requests.post(
+                self.html_search_url,
+                data={"q": query},
+                headers=self.headers,
+                timeout=8
+            )
+            html_response.raise_for_status()
+            html = html_response.text
+
+            link_matches = re.findall(
+                r'<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+                html,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            snippet_matches = re.findall(
+                r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>|<div[^>]*class="result__snippet"[^>]*>(.*?)</div>',
+                html,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+
+            parsed_results = []
+            for i, (link, title_html) in enumerate(link_matches[:5]):
+                title = re.sub(r"<.*?>", "", title_html).strip()
+                title = unescape(title)
+                link = unescape(link)
+                snippet = ""
+                if i < len(snippet_matches):
+                    snippet_html = snippet_matches[i][0] or snippet_matches[i][1]
+                    snippet = unescape(re.sub(r"<.*?>", "", snippet_html).strip())
+
+                # DuckDuckGo can return redirect links (/l/?uddg=...)
+                uddg_match = re.search(r"[?&]uddg=([^&]+)", link)
+                if uddg_match:
+                    link = requests.utils.unquote(uddg_match.group(1))
+
+                parsed_results.append({
+                    "title": title or "N/A",
+                    "snippet": snippet or "No snippet available.",
+                    "link": link or "N/A",
+                })
+
+            return parsed_results
         except requests.exceptions.Timeout:
             return []
         except requests.exceptions.RequestException as e:
