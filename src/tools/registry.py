@@ -34,6 +34,17 @@ class ToolRegistry:
     def list_specs(self) -> List[dict]:
         return [tool.to_spec() for tool in self._tools.values()]
 
+    def as_agent_tools(self) -> List[dict]:
+        """Return tool specs with executors for ReActAgent."""
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "executor": tool,
+            }
+            for tool in self._tools.values()
+        ]
+
     def execute(self, tool_name: str, args: str) -> str:
         tool = self._tools.get(tool_name)
         if not tool:

@@ -1,4 +1,5 @@
 from src.tools.base_tool import BaseTool
+from src.tools.demo_data import DEMO_WEB_RESULTS
 import requests
 from typing import List, Dict
 import re
@@ -30,6 +31,9 @@ class WebSearchTool(BaseTool):
             results = self._search_web(query)
 
             if not results:
+                demo = DEMO_WEB_RESULTS.get(query.lower())
+                if demo:
+                    return self._format_demo_results(query, demo)
                 return f"No search results found for '{query}'."
 
             # Format results
@@ -41,6 +45,9 @@ class WebSearchTool(BaseTool):
 
             return result_text
         except Exception as e:
+            demo = DEMO_WEB_RESULTS.get(query.lower())
+            if demo:
+                return self._format_demo_results(query, demo)
             return f"Error searching web: {str(e)}"
 
     def _search_web(self, query: str) -> List[Dict]:
@@ -121,15 +128,28 @@ class WebSearchTool(BaseTool):
                 if uddg_match:
                     link = requests.utils.unquote(uddg_match.group(1))
 
+                # Skip obvious ad/redirect tracking links.
+                if "duckduckgo.com/y.js" in link or "ad_provider=" in link:
+                    continue
+
                 parsed_results.append({
                     "title": title or "N/A",
                     "snippet": snippet or "No snippet available.",
                     "link": link or "N/A",
                 })
 
-            return parsed_results
+            return parsed_results[:3]
         except requests.exceptions.Timeout:
             return []
         except requests.exceptions.RequestException as e:
             raise Exception(f"DuckDuckGo API error: {str(e)}")
+
+    @staticmethod
+    def _format_demo_results(query: str, rows: list[tuple[str, str, str]]) -> str:
+        result_text = f"Demo search results for '{query}' (fallback data):\n\n"
+        for i, (title, snippet, link) in enumerate(rows[:3], 1):
+            result_text += f"{i}. {title}\n"
+            result_text += f"   {snippet}\n"
+            result_text += f"   Link: {link}\n\n"
+        return result_text
 
